@@ -1,0 +1,9 @@
+export enum ChartPartDetail {
+  FRONT_BODY = 'FRONT_BODY', // 앞몸판
+  BACK_BODY = 'BACK_BODY', // 뒷몸판
+  UPPER_EXPANDED_VIEW = 'UPPER_EXPANDED_VIEW', // 상단 전개도
+  LOWER_EXPANDED_VIEW = 'LOWER_EXPANDED_VIEW', // 하단 전개도
+  SET_IN_SLEEVE = 'SET_IN_SLEEVE', // 셋인형
+  RAGLAN_SLEEVE = 'RAGLAN_SLEEVE', // 래글런형
+  TOP_DOWN_SLEEVE = 'TOP_DOWN_SLEEVE', // 탑다운 소매
+}

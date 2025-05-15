@@ -1,0 +1,102 @@
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Get runner IP
+        id: ip
+        run: echo "IP=$(curl -s https://ifconfig.me)" >> $GITHUB_OUTPUT
+
+      - name: Allow SSH from GitHub Actions IP
+        run: |
+          aws ec2 authorize-security-group-ingress \
+            --group-id ${{ secrets.SECURITY_GROUP_ID }} \
+            --protocol tcp --port 22 \
+            --cidr ${{ steps.ip.outputs.IP }}/32 \
+            --region ${{ secrets.AWS_REGION }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+
+      - name: Cache Docker buildx layer
+        uses: actions/cache@v3
+        with:
+            path: /tmp/.buildx-cache
+            key: ${{ runner.os }}-buildx-${{ hashFiles('**/package-lock.json') }}
+            restore-keys: |
+                ${{ runner.os }}-buildx-
+
+      - name: Build Docker image and save to tar
+        run: |
+            chmod +x ./build.sh
+            ./build.sh
+
+      - name: Upload env to EC2
+        uses: appleboy/scp-action@v0.1.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          port: ${{ secrets.EC2_PORT || 22 }}
+          source: .env.dev
+          target: '/data/docker/dddorok-admin/deploy'
+
+      - name: Upload Docker image to EC2
+        uses: appleboy/scp-action@v0.1.3
+        with:
+            host: ${{ secrets.EC2_HOST }}
+            username: ${{ secrets.EC2_USER }}
+            key: ${{ secrets.EC2_KEY }}
+            port: ${{ secrets.EC2_PORT || 22 }}
+            source: dddorok-admin-backend.tar
+            target: '/data/docker/dddorok-admin/deploy'
+
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          port: 22
+          script: |
+            chmod +x /data/docker/dddorok-admin/deploy/deploy.sh
+            /data/docker/dddorok-admin/deploy/deploy.sh
+
+      - name: Remove SSH access from GitHub Actions IP
+        if: always()
+        run: |
+          aws ec2 revoke-security-group-ingress \
+            --group-id ${{ secrets.SECURITY_GROUP_ID }} \
+            --protocol tcp --port 22 \
+            --cidr ${{ steps.ip.outputs.IP }}/32 \
+            --region ${{ secrets.AWS_REGION }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+
+      - name: Notify Slack on Success
+        if: success()
+        run: |
+          curl -X POST -H 'Content-type: application/json' \
+            --data '{
+              "text": "✅ *배포 성공 - dddorok-admin-backend*\n> *커밋 메시지:* <https://github.com/${{ github.repository }}/commit/${{ github.sha }}|${{ github.event.head_commit.message }}>\n> *워크플로우:* <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Action 확인하기> <@U08KFM61DPZ>"
+            }' \
+            ${{ secrets.SLACK_WEBHOOK_URL }}
+        
+      - name: Notify Slack on Failure
+        if: failure()
+        run: |
+          curl -X POST -H 'Content-type: application/json' \
+            --data '{
+              "text": "🚨 *배포 실패 알림 - dddorok-admin-backend* 🚨\n> *커밋 메시지:* <https://github.com/${{ github.repository }}/commit/${{ github.sha }}|${{ github.event.head_commit.message }}>\n> *워크플로우:* <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Action 확인하기>\n\n🔴 즉시 확인 및 조치 요망! <@U08KFM61DPZ>"
+            }' \
+            ${{ secrets.SLACK_WEBHOOK_URL }}
