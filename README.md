@@ -5,7 +5,7 @@ Nest.js 학습 및 실습 기록
 
 ## 📚 프로젝트 문서
 
-[Nest.js 프로젝트 문서 바로가기](https://www.notion.so/Nest-js-1d34bcf540f880eea375c05e8baa60a7)
+[Nest.js 프로젝트 문서 바로가기](https://velog.io/@highgarden/Nest.js-시작기-Spring-백엔드-개발자의-Node.js-첫걸음-제로베이스에서-DDD까지)
 
 > Nest.js의 구조, 코드 예시, 학습 메모 등이 포함되어 있으며,  
 > 프로젝트의 전반적인 흐름과 구현 방법에 대한 상세한 설명이 포함되어 있습니다.
