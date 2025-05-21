@@ -1,3 +1,6 @@
+on:
+  push:
+    branches: ["__never_trigger__"]
 jobs:
   deploy:
     runs-on: ubuntu-latest
